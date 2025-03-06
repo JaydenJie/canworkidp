@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'characteristics_page.dart';
-import 'package:permission_handler/permission_handler.dart'; // Add this package to pubspec.yaml
+import 'package:permission_handler/permission_handler.dart';
 
 class BluetoothScannerPage extends StatefulWidget {
   const BluetoothScannerPage({super.key});

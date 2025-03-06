@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'bluetooth_searching_page.dart';
 
-//hello egg
 void main() {
   runApp(MyApp());
 }
@@ -11,7 +10,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: BluetoothScannerPage(), // The first page of the app
+      home: BluetoothScannerPage(), // Homepage
     );
   }
 }

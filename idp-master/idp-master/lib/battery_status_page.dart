@@ -5,6 +5,11 @@ class BatteryMonitorPage extends StatelessWidget {
 
   const BatteryMonitorPage({super.key, required this.readings});
 
+  // Color scheme definition
+  static const Color primaryBlue = Color(0xFF2196F3);  // Material Blue
+  static const Color lightBlue = Color(0xFFE3F2FD);    // Very light blue for backgrounds
+  static const Color darkBlue = Color(0xFF1976D2);     // Darker blue for emphasis
+
   int _parseVoltage(int highByte, int lowByte) {
     String hexString = highByte.toRadixString(16).padLeft(2, '0') +
         lowByte.toRadixString(16).padLeft(2, '0');
@@ -64,55 +69,46 @@ class BatteryMonitorPage extends StatelessWidget {
     final batteryData = _processBatteryData(readings);
 
     return Scaffold(
+      backgroundColor: lightBlue,
       appBar: AppBar(
-        title: const Text('Battery Monitor'),
+        elevation: 0,
+        backgroundColor: Colors.white,
+        title: const Text(
+          'Battery Monitor',
+          style: TextStyle(
+            color: primaryBlue,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        child: Padding(
+      body: SafeArea(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Summary Cards with adjusted height
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildSummaryCard(
-                      'Total voltage(mV)',
-                      batteryData['totalVoltage'].toString(),
-                      'Current (mA)',
-                      batteryData['current'].toString(),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildSummaryCard(
-                      'Temperature (°C)',
-                      batteryData['temperature'].toString(),
-                      'SOC(%)',
-                      batteryData['soc'].toString(),
-                    ),
-                  ),
-                ],
+              const Text(
+                'Summary',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
               ),
               const SizedBox(height: 16),
-              // Adjusted Cell Grid
-              GridView.builder(
-                physics: const NeverScrollableScrollPhysics(),
-                shrinkWrap: true,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  childAspectRatio: 3.0, // Increased from 2.5 to make cells wider
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
+              _buildMainStats(batteryData),
+              const SizedBox(height: 24),
+              const Text(
+                'Cell Details',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
                 ),
-                itemCount: 15,
-                itemBuilder: (context, index) {
-                  return _buildCellCard(
-                    'Cell_${index + 1}',
-                    batteryData['cell${index + 1}'].toString(),
-                  );
-                },
               ),
+              const SizedBox(height: 16),
+              _buildCellGrid(batteryData),
             ],
           ),
         ),
@@ -120,53 +116,157 @@ class BatteryMonitorPage extends StatelessWidget {
     );
   }
 
-  Widget _buildSummaryCard(String title1, String value1, String title2, String value2) {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '$title1: $value1',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              '$title2: $value2',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
+  Widget _buildMainStats(Map<String, int> data) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [primaryBlue, darkBlue],
         ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: primaryBlue.withOpacity(0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              _buildMainStatItem(
+                'Total Voltage',
+                '${data['totalVoltage']}',
+                'mV',
+                Icons.bolt,
+              ),
+              const SizedBox(width: 24),
+              _buildMainStatItem(
+                'Current',
+                '${data['current']}',
+                'mA',
+                Icons.electric_meter,
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              _buildMainStatItem(
+                'Temperature',
+                '${data['temperature']}',
+                '°C',
+                Icons.thermostat,
+              ),
+              const SizedBox(width: 24),
+              _buildMainStatItem(
+                'SOC',
+                '${data['soc']}',
+                '%',
+                Icons.battery_full,
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildCellCard(String title, String value) {
-    return Card(
-      elevation: 2,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: Text(
-            '$title(mV): $value',
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+  Widget _buildMainStatItem(String label, String value, String unit, IconData icon) {
+    return Expanded(
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            color: Colors.white,
+            size: 24,
           ),
-        ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '$value $unit',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildCellGrid(Map<String, int> data) {
+    return GridView.builder(
+      physics: const NeverScrollableScrollPhysics(),
+      shrinkWrap: true,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        childAspectRatio: 1.2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+      ),
+      itemCount: 15,
+      itemBuilder: (context, index) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Cell ${index + 1}',
+                style: const TextStyle(
+                  color: primaryBlue,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${data['cell${index + 1}']}',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const Text(
+                'mV',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

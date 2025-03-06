@@ -26,7 +26,7 @@ class _BleControllerState extends State<BleController> {
 
   void _initBluetooth() async {
     if (await FlutterBluePlus.isSupported == false) {
-      print("此裝置不支援藍牙");
+      print("Bluetooth is not supported on this device");
       return;
     }
     _adapterStateSubscription = FlutterBluePlus.adapterState.listen((state) {
