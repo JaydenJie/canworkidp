@@ -1,14 +1,83 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
-class BatteryMonitorPage extends StatelessWidget {
-  final List<List<int>> readings;
+class BatteryStatusPage extends StatefulWidget {
+  final List<List<int>> initialReadings;
+  final BluetoothCharacteristic? characteristic; // Add characteristic to subscribe to
 
-  const BatteryMonitorPage({super.key, required this.readings});
+  const BatteryStatusPage({
+    super.key,
+    required this.initialReadings,
+    this.characteristic, // Optional if we want to pass it from previous page
+  });
 
+  @override
+  State<BatteryStatusPage> createState() => _BatteryStatusPageState();
+}
+
+class _BatteryStatusPageState extends State<BatteryStatusPage> {
   // Color scheme definition
   static const Color primaryBlue = Color(0xFF2196F3);  // Material Blue
   static const Color lightBlue = Color(0xFFE3F2FD);    // Very light blue for backgrounds
   static const Color darkBlue = Color(0xFF1976D2);     // Darker blue for emphasis
+
+  List<List<int>> _readings = [];
+  Map<String, int> _batteryData = {};
+  StreamSubscription? _notifySubscription;
+  Timer? _refreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize with existing readings
+    _readings = List.from(widget.initialReadings);
+
+    // Process initial data
+    _updateBatteryData();
+
+    // Subscribe to real-time notifications if characteristic is provided
+    _setupRealTimeUpdates();
+
+    // Refresh UI periodically even if no new data (for animations)
+    _refreshTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _notifySubscription?.cancel();
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  void _setupRealTimeUpdates() {
+    if (widget.characteristic != null) {
+      // Enable notifications if not already enabled
+      if (!widget.characteristic!.isNotifying) {
+        widget.characteristic!.setNotifyValue(true);
+      }
+
+      // Subscribe to notifications using the correct property
+      _notifySubscription = widget.characteristic!.lastValueStream.listen((value) {
+        if (mounted) {
+          setState(() {
+            _readings.add(value);
+            // Keep only the last 20 readings to prevent memory issues
+            if (_readings.length > 20) {
+              _readings.removeAt(0);
+            }
+            _updateBatteryData();
+          });
+        }
+      });
+    }
+  }
+
+  void _updateBatteryData() {
+    _batteryData = _processBatteryData(_readings);
+  }
 
   int _parseVoltage(int highByte, int lowByte) {
     String hexString = highByte.toRadixString(16).padLeft(2, '0') +
@@ -66,50 +135,119 @@ class BatteryMonitorPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final batteryData = _processBatteryData(readings);
-
     return Scaffold(
       backgroundColor: lightBlue,
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.white,
         title: const Text(
-          'Battery Monitor',
+          'Battery Status',
           style: TextStyle(
             color: primaryBlue,
             fontWeight: FontWeight.w600,
           ),
         ),
         centerTitle: true,
+        actions: [
+          // Add refresh button to manually read if needed
+          if (widget.characteristic != null && widget.characteristic!.properties.read)
+            IconButton(
+              icon: const Icon(Icons.refresh, color: primaryBlue),
+              onPressed: () async {
+                try {
+                  final value = await widget.characteristic!.read();
+                  if (mounted) {
+                    setState(() {
+                      _readings.add(value);
+                      _updateBatteryData();
+                    });
+                  }
+                } catch (e) {
+                  // Handle error (could show a snackbar)
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error reading data: $e')),
+                  );
+                }
+              },
+            ),
+        ],
       ),
       body: SafeArea(
+        bottom: true, // Ensure safe area at bottom
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Summary',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
+          // Add very generous bottom padding to prevent overflow
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 32.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Status indicator
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.circle,
+                        size: 12,
+                        color: widget.characteristic?.isNotifying == true
+                            ? Colors.green
+                            : Colors.orange,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        widget.characteristic?.isNotifying == true
+                            ? 'Live Data'
+                            : 'Static Data',
+                        style: TextStyle(
+                          color: widget.characteristic?.isNotifying == true
+                              ? Colors.green
+                              : Colors.orange,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              _buildMainStats(batteryData),
-              const SizedBox(height: 24),
-              const Text(
-                'Cell Details',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+                const SizedBox(height: 16),
+                const Text(
+                  'Summary',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              _buildCellGrid(batteryData),
-            ],
+                const SizedBox(height: 16),
+                _buildMainStats(_batteryData),
+                const SizedBox(height: 24),
+                const Text(
+                  'Cell Details',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _buildCellGrid(_batteryData),
+                const SizedBox(height: 24),
+                // Show number of readings received
+                Text(
+                  'Data points: ${_readings.length}',
+                  style: const TextStyle(
+                    color: Colors.grey,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
           ),
         ),
       ),
@@ -213,18 +351,29 @@ class BatteryMonitorPage extends StatelessWidget {
   }
 
   Widget _buildCellGrid(Map<String, int> data) {
+    // Calculate a more appropriate aspect ratio based on the device size
+    final screenWidth = MediaQuery.of(context).size.width;
+    final itemWidth = (screenWidth - 32 - 24) / 3; // Width minus padding and spacing
+
+    // Use a smaller aspect ratio to provide more height for each cell
+    // Lower values give more height to each item
+    final aspectRatio = itemWidth / 100;
+
     return GridView.builder(
       physics: const NeverScrollableScrollPhysics(),
       shrinkWrap: true,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
-        childAspectRatio: 1.2,
+        childAspectRatio: aspectRatio,
         crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
+        mainAxisSpacing: 16, // Increased spacing between rows
       ),
       itemCount: 15,
       itemBuilder: (context, index) {
-        return Container(
+        final cellValue = data['cell${index + 1}'] ?? 0;
+        // Add animation for value changes
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
@@ -235,8 +384,13 @@ class BatteryMonitorPage extends StatelessWidget {
                 offset: const Offset(0, 2),
               ),
             ],
+            // Add a subtle border that changes color based on cell value
+            border: Border.all(
+              color: _getCellColor(cellValue),
+              width: 2,
+            ),
           ),
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -250,10 +404,11 @@ class BatteryMonitorPage extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                '${data['cell${index + 1}']}',
-                style: const TextStyle(
+                '$cellValue',
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
+                  color: _getCellTextColor(cellValue),
                 ),
               ),
               const Text(
@@ -268,5 +423,21 @@ class BatteryMonitorPage extends StatelessWidget {
         );
       },
     );
+  }
+
+  // Helper function to determine cell color based on voltage
+  Color _getCellColor(int value) {
+    if (value <= 0) return Colors.grey.withOpacity(0.3);
+    if (value < 3000) return Colors.red.withOpacity(0.5); // Low voltage
+    if (value > 4200) return Colors.orange.withOpacity(0.5); // High voltage
+    return Colors.green.withOpacity(0.3); // Normal voltage
+  }
+
+  // Helper function for text color
+  Color _getCellTextColor(int value) {
+    if (value <= 0) return Colors.grey;
+    if (value < 3000) return Colors.red; // Low voltage
+    if (value > 4200) return Colors.orange; // High voltage
+    return Colors.black; // Normal voltage
   }
 }

@@ -83,7 +83,7 @@ ASCII: $asciiData
   }
 
   // In your _buildDataDisplay method in CharacteristicsPage
-  Widget _buildDataDisplay(String uuid, List<List<int>> history) {
+  Widget _buildDataDisplay(String uuid, List<List<int>> history, BluetoothCharacteristic characteristic) {
     if (history.isEmpty) return const SizedBox.shrink();
 
     return Card(
@@ -100,16 +100,19 @@ ASCII: $asciiData
                     style: const TextStyle(fontWeight: FontWeight.bold)),
                 Row(
                   children: [
-                    // Add this button
+                    // Updated button with navigation to BatteryStatusPage
                     ElevatedButton(
                       onPressed: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (context) => BatteryMonitorPage(readings: history),
+                            builder: (context) => BatteryStatusPage(
+                              initialReadings: history,
+                              characteristic: characteristic, // Pass the characteristic for real-time updates
+                            ),
                           ),
                         );
                       },
-                      child: const Text('Battery Monitor'),
+                      child: const Text('Battery Status'),
                     ),
                     const SizedBox(width: 8),
                     IconButton(
@@ -125,7 +128,6 @@ ASCII: $asciiData
                 ),
               ],
             ),
-            // ... rest of your existing code ...
           ],
         ),
       ),
@@ -159,7 +161,8 @@ ASCII: $asciiData
           ),
 
         if (history.isNotEmpty)
-          _buildDataDisplay(characteristic.uuid.toString(), history),
+        // Pass the characteristic object
+          _buildDataDisplay(characteristic.uuid.toString(), history, characteristic),
 
         if (characteristic.properties.notify ||
             characteristic.properties.indicate)
