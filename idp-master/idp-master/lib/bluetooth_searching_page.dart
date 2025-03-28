@@ -187,13 +187,8 @@ class _BluetoothScannerPageState extends State<BluetoothScannerPage> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Connected to ${device.platformName}')),
           );
-          // Navigate to characteristics page
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => CharacteristicsPage(device: device),
-            ),
-          );
+          // Return the selected device instead of navigating
+          Navigator.pop(context, device);
         }
 
         // Setup disconnect listener
